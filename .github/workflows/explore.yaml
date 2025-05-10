@@ -30,12 +30,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -98,15 +101,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-1:
     runs-on: ubuntu-latest
     steps:
@@ -131,12 +152,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_1 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_1}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_1}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -199,15 +223,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_1}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_1}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_1}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-2:
     runs-on: ubuntu-latest
     steps:
@@ -232,12 +274,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_2 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_2}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_2}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -300,15 +345,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_2}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_2}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_2}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-3:
     runs-on: ubuntu-latest
     steps:
@@ -333,12 +396,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_3 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_3}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_3}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -401,15 +467,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_3}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_3}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_3}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-4:
     runs-on: ubuntu-latest
     steps:
@@ -434,12 +518,16 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_4 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_4}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_4}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -502,15 +590,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_4}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_4}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_4}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-5:
     runs-on: ubuntu-latest
     steps:
@@ -535,12 +641,16 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_5 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_5}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_5}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -603,15 +713,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_5}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_5}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_5}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-6:
     runs-on: ubuntu-latest
     steps:
@@ -636,12 +764,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_6 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_6}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_6}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -704,15 +835,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_6}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_6}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_6}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-7:
     runs-on: ubuntu-latest
     steps:
@@ -737,12 +886,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_7 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_7}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_7}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -805,15 +957,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_7}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_7}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_7}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-8:
     runs-on: ubuntu-latest
     steps:
@@ -838,12 +1008,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_8 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_8}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_8}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -906,15 +1079,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_8}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_8}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_8}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-9:
     runs-on: ubuntu-latest
     steps:
@@ -939,12 +1130,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_9 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_9}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_9}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1007,15 +1201,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_9}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_9}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_9}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-10:
     runs-on: ubuntu-latest
     steps:
@@ -1040,12 +1252,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_10 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_10}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_10}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1108,15 +1323,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_10}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_10}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_10}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-11:
     runs-on: ubuntu-latest
     steps:
@@ -1141,12 +1374,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_11 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_11}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_11}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1209,15 +1445,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_11}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_11}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_11}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-12:
     runs-on: ubuntu-latest
     steps:
@@ -1242,12 +1496,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_12 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_12}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_12}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1310,15 +1567,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_12}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_12}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_12}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-13:
     runs-on: ubuntu-latest
     steps:
@@ -1343,12 +1618,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_13 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_13}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_13}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1411,15 +1689,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_13}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_13}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_13}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-14:
     runs-on: ubuntu-latest
     steps:
@@ -1444,12 +1740,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_14 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_14}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_14}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1512,15 +1811,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_14}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_14}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_14}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-15:
     runs-on: ubuntu-latest
     steps:
@@ -1545,12 +1862,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_15 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_15}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_15}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1613,15 +1933,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_15}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_15}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_15}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-16:
     runs-on: ubuntu-latest
     steps:
@@ -1646,12 +1984,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_16 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_16}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_16}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1714,15 +2055,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_16}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_16}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_16}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-17:
     runs-on: ubuntu-latest
     steps:
@@ -1747,12 +2106,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_17 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_17}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_17}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1815,15 +2177,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_17}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_17}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_17}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-18:
     runs-on: ubuntu-latest
     steps:
@@ -1848,12 +2228,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_18 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_18}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_18}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -1916,15 +2299,33 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_18}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_18}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_18}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
   setup-and-run-19:
     runs-on: ubuntu-latest
     steps:
@@ -1949,12 +2350,15 @@ jobs:
 
     - name: Allow MongoDB Access
       run: |
-        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_19 }} \
-            --allow=tcp:${{ secrets.MONGODB_PORT }} \
-            --source-ranges=${{ env.RUNNER_IP }}/32 \
-            --target-tags=mongodb-server \
-            --project=${{ secrets.GCP_PROJECT }} \
-            --description="Temporary MongoDB access for GitHub Actions"
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_19}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_19}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
 
     - name: Checkout Private Repository API
       uses: actions/checkout@v3
@@ -2017,15 +2421,32 @@ jobs:
           -d '{"type":"app","workers":1}'
     - name: Stream Logs
       run: |
-        pm2 logs -f gp-explorer
+        pm2 logs --lines 1000 as-explorer | while read line; do
+        echo "RAW LINE: $line"
+        if [[ "$line" == *"completed all!"* ]]; then
+            echo "MATCH FOUND - EXITING"
+            pkill -f "pm2 logs"
+            break
+        fi
+        done
+        
+        # This will execute after the loop breaks
+        pm2 delete as-explorer
   
 
     - name: Remove MongoDB Access
       if: always()
       run: |
-        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_19}} \
-            --project=${{secrets.GCP_PROJECT}} \
-            --quiet || true
-
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_19}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_19}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
 
 

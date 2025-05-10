@@ -1,0 +1,2031 @@
+name: Secure Repository Runner
+
+on:
+  workflow_dispatch:
+#   push:
+#     branches: [ main ]
+
+jobs:
+  setup-and-run:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=0" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-1:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_1 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=1" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_1}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-2:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_2 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=2" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_2}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-3:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_3 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=3" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_3}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-4:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_4 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=4" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_4}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-5:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_5 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=5" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_5}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-6:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_6 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=6" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_6}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-7:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_7 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=7" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_7}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-8:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_8 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=6" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_8}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-9:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_9 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=9" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_9}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-10:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_10 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=10" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_10}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-11:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_11 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=11" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_11}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-12:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_12 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=12" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_12}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-13:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_13 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=13" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_13}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-14:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_14 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=14" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_14}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-15:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_15 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=15" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_15}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-16:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_16 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=16" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_16}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-17:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_17 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=17" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_17}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-18:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_18 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=18" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_18}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+  setup-and-run-19:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        gcloud compute firewall-rules create ${{ secrets.FIREWALL_RULE_NAME_19 }} \
+            --allow=tcp:${{ secrets.MONGODB_PORT }} \
+            --source-ranges=${{ env.RUNNER_IP }}/32 \
+            --target-tags=mongodb-server \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --description="Temporary MongoDB access for GitHub Actions"
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_gplay_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/gp-explorer-ts
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./gp-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd gp-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd gp-api
+        pm2 start src/index.js --name "gp-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd gp-explorer
+        npm install express cors dotenv @types/express @types/cors @types/dotenv
+        npm install
+        
+    - name: Add Env
+      run: |
+        cd gp-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "COUNTRY_CODE=${{secrets.COUNTRY_CODE}}" >> .env
+        echo "LIMIT=50000" >> .env
+        echo "INDEX=19" >> .env
+        npm run build
+
+
+    - name: Run Application Explorer
+      run: |
+        cd gp-explorer
+        pm2 start dist/index.js --name "gp-explorer"
+    - name: Wait for app to be ready
+      run: |
+        echo "Waiting 15 seconds for app to start..."
+        sleep 15
+    - name: Start worker
+      run: |
+        curl -X POST http://localhost:8080/start-worker \
+          -H "Content-Type: application/json" \
+          -d '{"type":"app","workers":1}'
+    - name: Stream Logs
+      run: |
+        pm2 logs -f gp-explorer
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        gcloud compute firewall-rules delete ${{secrets.FIREWALL_RULE_NAME_19}} \
+            --project=${{secrets.GCP_PROJECT}} \
+            --quiet || true
+
+
+

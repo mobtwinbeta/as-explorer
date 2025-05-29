@@ -73,7 +73,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -169,7 +169,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -269,7 +269,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -369,7 +369,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -469,7 +469,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -570,7 +570,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -668,7 +668,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -767,7 +767,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -865,7 +865,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -965,7 +965,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1064,7 +1064,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1164,7 +1164,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1264,7 +1264,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1364,7 +1364,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1464,7 +1464,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1563,7 +1563,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1662,7 +1662,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1760,7 +1760,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1860,7 +1860,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |
@@ -1960,7 +1960,7 @@ jobs:
       run: |
         cd as-explorer
         npm install
-        npm install --save-dev typescript ts-node @types/node
+        npm install --save-dev typescript ts-node @types/node tsx
         
     - name: Add Env
       run: |

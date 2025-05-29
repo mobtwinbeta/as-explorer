@@ -1,0 +1,1997 @@
+name: Processure Repository Runner
+
+on:
+  workflow_dispatch:
+#   push:
+#     branches: [ main ]
+
+jobs:
+  setup-and-run:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=0" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-1:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_1}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_1}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=1" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_1}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_1}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-2:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_2}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_2}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=2" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_2}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_2}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-3:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_3}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_3}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=3" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_3}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_3}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-4:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_4}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_4}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=4" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_4}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_4}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-5:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_5}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_5}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=5" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_5}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_5}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-6:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_6}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_6}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=6" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_6}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_6}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-7:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_7}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_7}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=7" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_7}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_7}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-8:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_8}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_8}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=8" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_8}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_8}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-9:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_9}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_9}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=9" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_9}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_9}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-10:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_10}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_10}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=10" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_10}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_10}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-11:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_11}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_11}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=11" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_11}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_11}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-12:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_12}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_12}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=12" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_12}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_12}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-13:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_13}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_13}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=13" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_13}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_13}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-14:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_14}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_14}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=14" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_14}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_14}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-15:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_15}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_15}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=15" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_15}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_15}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-16:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_16}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_16}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=16" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_16}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_16}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-17:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_17}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_17}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=17" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_17}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_17}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-18:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_18}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_18}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=18" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_18}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_18}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+  setup-and-run-19:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Unmask COUNTRY_CODE
+      run: |
+        echo "::remove-mask name=COUNTRY_CODE::"
+    - name: Get Runner IP
+      id: ip
+      run: |
+        RUNNER_IP=$(curl -s https://api.ipify.org)
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+        echo "::set-output name=runner_ip::$RUNNER_IP"
+    # Authenticate with Google Cloud
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Allow MongoDB Access
+      run: |
+        # Get current allowed IPs (filter out empty values)
+        CURRENT_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_19}} --format="value(sourceRanges)" --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' | grep -v '^$')
+        
+        # Add new IP while preserving existing ones (with /32 suffix)
+        UPDATED_IPS=$(echo -e "$CURRENT_IPS\n${{ env.RUNNER_IP }}/32" | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_19}} --source-ranges="${UPDATED_IPS}" --project=${{ secrets.GCP_PROJECT }}
+
+
+    - name: Checkout Private Repository API
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/mobtwin_appstore_api
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-api
+    - name: Checkout Private Repository Explorer
+      uses: actions/checkout@v3
+      with:
+        repository: Mobtwin/scraper.exe
+        token: ${{ secrets.PAT_TOKEN }}  # Personal Access Token with repo access
+        path: ./as-explorer
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install PM2 globally
+      run: npm install pm2 -g
+
+    - name: Install Dependencies API
+      run: |
+        cd as-api
+        npm install
+
+    - name: Run Application API
+      run: |
+        cd as-api
+        pm2 start src/index.js --name "as-api"
+    - name: Install Dependencies Explorer
+      run: |
+        cd as-explorer
+        npm install
+        npm install --save-dev typescript ts-node @types/node
+        
+    - name: Add Env
+      run: |
+        cd as-explorer
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+        echo "MONGO_DB_NAME=mobtwin" >> .env
+        echo "IOS_API=http://localhost:3000" >> .env
+        echo "LIMIT=150000" >> .env
+        echo "INDEX=19" >> .env
+        
+
+
+    - name: Run Application Explorer
+      run: |
+        cd as-explorer
+        npx tsx src/main.ts
+  
+
+    - name: Remove MongoDB Access
+      if: always()
+      run: |
+        # Get current IPs excluding our current runner
+        UPDATED_IPS=$(gcloud compute firewall-rules describe ${{secrets.FIREWALL_RULE_NAME_19}} \
+          --format="value(sourceRanges)" \
+          --project=${{ secrets.GCP_PROJECT }} | tr ';' '\n' \
+          | grep -v "^${{ env.RUNNER_IP }}/32$" \
+          | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+        
+        # Update firewall rule
+        gcloud compute firewall-rules update ${{secrets.FIREWALL_RULE_NAME_19}} \
+          --source-ranges="${UPDATED_IPS}" \
+          --project=${{ secrets.GCP_PROJECT }}
+
+
